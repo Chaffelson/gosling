@@ -1,0 +1,14 @@
+version = 0.1
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "gosling"
+resolve_s3 = true
+s3_prefix = "gosling"
+region = "eu-central-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+disable_rollback = false

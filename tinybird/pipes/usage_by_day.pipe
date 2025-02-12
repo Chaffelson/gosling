@@ -1,0 +1,13 @@
+TOKEN "READ_usage_by_day_endpoint" READ
+
+NODE agg
+SQL >
+
+    SELECT 
+      toDate(updated_at) as dt,
+      count(distinct user_id) as user_count,
+      count() as request_count
+    FROM chat_history FINAL
+    group by dt
+
+

@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Gosling is a simple Slack integrated chatbot using Lambda and Pinecone.
+
+# Note that SAM is very unreliable about updating Environment Variables set in Templates.
+# If you need to update an environment variable, do it in the SAM config file and then also in the UI.
+
+Parameters:
+  AssistantName:
+    Type: String
+    Description: Name of the assistant to use for the Pinecone chatbot
+    Default: fletcher-20250121
+
+  S3Prefix:
+    Type: String
+    Description: Prefix to use for Gosling docs in S3
+    Default: rag-documents/
+
+  OutlineBaseUrl:
+    Type: String
+    Description: Base URL for the Outline API
+    Default: https://wiki.outline.co/api
+
+  SlackChannelAllowList:
+    Type: String
+    Description: List of Slack channels to allow Gosling to respond to
+    Default: "*"
+  
+  SlackBotUserId:
+    Type: String
+    Description: User ID of the Slack bot
+    Default: "*"
+
+Resources:
+  GoslingLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-lambda'
+      CodeUri: ../src
+      Description: Gosling - Knowledge Base Slackbot
+      MemorySize: 256
+      Timeout: 900
+      Handler: slackbot.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      EphemeralStorage:
+        Size: 512
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref GoslingTable
+          S3_BUCKET_NAME: !Ref GoslingDocsBucket
+          S3_PREFIX: !Ref S3Prefix
+          ASSISTANT_NAME: !Ref AssistantName
+          OUTLINE_BASE_URL: !Ref OutlineBaseUrl
+          SLACK_CHANNEL_ALLOW_LIST: !Ref SlackChannelAllowList
+          SLACK_BOT_USER_ID: !Ref SlackBotUserId
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 60
+        MaximumRetryAttempts: 0
+        DestinationConfig: {}
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+      PackageType: Zip
+      Policies:
+        - !Ref GoslingLambdaPolicy
+      RecursiveLoop: Terminate
+      ReservedConcurrentExecutions: 1
+      SnapStart:
+        ApplyOn: None
+      Tags:
+        Project: Gosling
+      Events:
+        Schedule1:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 2 * * ? *)
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
+  GoslingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: channel_id
+          AttributeType: S
+        - AttributeName: event_ts
+          AttributeType: S
+      TableName: !Sub '${AWS::StackName}-eventHandler'
+      KeySchema:
+        - AttributeName: channel_id
+          KeyType: HASH
+        - AttributeName: event_ts
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: false
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: Gosling
+  GoslingURLPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GoslingLambda
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+  GoslingDocsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub 'gosling-${AWS::StackName}-docs-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAllObjectVersions
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+            ExpirationInDays: 1
+      Tags:
+        - Key: Project
+          Value: Gosling
+  GoslingLambdaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DependsOn: 
+      - GoslingTable
+      - GoslingDocsBucket
+    Properties:
+      Description: Comprehensive policy for Gosling Lambda operations
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DDBAccess
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+            Resource: !GetAtt GoslingTable.Arn
+          - Sid: LoggingAccess
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: '*'
+          - Sid: LambdaAccess
+            Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource: '*'
+          - Sid: SecretsManagerAccess
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+              - secretsmanager:ListSecrets
+            Resource:
+              - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/gosling/*'
+          - Sid: S3Access
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !GetAtt GoslingDocsBucket.Arn
+              - !Sub "${GoslingDocsBucket.Arn}/*"
+Outputs:
+  GoslingFunctionUrl:
+    Description: "Lambda Function URL"
+    Value: !GetAtt GoslingLambdaUrl.FunctionUrl
+  DocsBucketName:
+    Description: "Name of the S3 bucket for Gosling docs"
+    Value: !Ref GoslingDocsBucket

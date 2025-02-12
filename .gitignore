@@ -1,0 +1,8 @@
+.env
+.tinyb
+*.pyc
+src/gosling/__pycache__/
+src/gosling/__pycache__/*
+*/.DS_Store
+infra/.aws-sam/
+infra/.aws-sam/*

@@ -1,0 +1,11 @@
+TOKEN "READ_chat_history_by_ids" READ
+
+NODE endpoint
+SQL >
+
+    SELECT 
+      updated_at, channel_id, user_id, request, response, context, context_metadata, event_ts, thread_ts
+    FROM chat_history FINAL
+    order by updated_at DESC
+
+
