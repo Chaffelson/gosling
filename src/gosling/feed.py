@@ -67,20 +67,20 @@ def convert_markdown_files(
     
     for doc in markdown_files:
         try:
-            with open(doc["file_path"], "r") as file:
+            with open(doc["file_path"], "r", encoding='utf-8') as file:
                 content = file.read()
                 # Only convert tables and clean up excessive newlines
                 content = convert_table_to_text(content)
                 content = re.sub(r'\n{3,}', '\n\n', content)
             
             # Calculate hash of content
-            content_hash = sha256(content.encode()).hexdigest()
+            content_hash = sha256(content.encode('utf-8')).hexdigest()
             
             # Use source instead of parent directory for uniqueness
             safe_name = f"{doc['source']}_{Path(doc['file_path']).stem}.txt"
             out_file_path = os.path.join(output_path, safe_name)
             
-            with open(out_file_path, "w") as f:
+            with open(out_file_path, "w", encoding='utf-8') as f:
                 f.write(content)
             
             new_metadata: FileMetadata = {
@@ -356,7 +356,7 @@ def parse_llms_full(url: str, source: str) -> List[FileMetadata]:
         file_path = os.path.join(temp_dir, filename)
         
         try:
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding='utf-8') as f:
                 # Add title as first line of content
                 title = doc_url.split('/')[-1].replace('-', ' ').title()
                 f.write(f"# {title}\n\n")

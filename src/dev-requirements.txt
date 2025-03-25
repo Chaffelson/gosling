@@ -16,3 +16,7 @@ python-lambda
 
 # Tinybird
 tinybird-cli
+
+# Deployment
+tomli
+aws-sam-cli
