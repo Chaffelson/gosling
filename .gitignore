@@ -6,3 +6,4 @@ src/gosling/__pycache__/*
 */.DS_Store
 infra/.aws-sam/
 infra/.aws-sam/*
+.venv

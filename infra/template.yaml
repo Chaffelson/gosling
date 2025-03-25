@@ -9,7 +9,7 @@ Parameters:
   AssistantName:
     Type: String
     Description: Name of the assistant to use for the Pinecone chatbot
-    Default: fletcher-20250121
+    Default: gosling-202502
 
   S3Prefix:
     Type: String
@@ -68,7 +68,6 @@ Resources:
       Policies:
         - !Ref GoslingLambdaPolicy
       RecursiveLoop: Terminate
-      ReservedConcurrentExecutions: 1
       SnapStart:
         ApplyOn: None
       Tags:

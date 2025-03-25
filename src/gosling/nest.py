@@ -49,7 +49,11 @@ def get_aws_client(service_name: str):
         Boto3 client for the specified service
     """
     logger.debug(f"Creating new AWS client for {service_name}")
-    session = boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION)
+    # Only use profile_name if not running in Lambda
+    session_kwargs = {"region_name": AWS_REGION}
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        session_kwargs["profile_name"] = AWS_PROFILE
+    session = boto3.Session(**session_kwargs)
     return session.client(service_name, config=aws_config)
 
 @lru_cache()
@@ -58,7 +62,11 @@ def get_resource(resource_name: str):
     Get a boto3 resource for the specified AWS resource.
     Caches the resource after first creation.
     """
-    session = boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION)
+    # Only use profile_name if not running in Lambda
+    session_kwargs = {"region_name": AWS_REGION}
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        session_kwargs["profile_name"] = AWS_PROFILE
+    session = boto3.Session(**session_kwargs)
     return session.resource(resource_name, config=aws_config)
 
 @lru_cache()
@@ -207,7 +215,7 @@ class SlackEventData:
                 "updated_at": time.time()
             }
             r = requests.post(
-                "https://api.tinybird.co/v0/events",
+                "https://api.europe-west2.gcp.tinybird.co/v0/events",
                 headers={
                     "Authorization": f"Bearer {get_secret('tinybird-api-key')}",
                     "Content-Type": "application/x-ndjson"
